@@ -65,6 +65,10 @@ label check
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 rd.live.check ks=cdrom:/ks.cfg
 </code></pre>
+The SO install also has a boot message that waits for the user to press ENTER before continuing.  We want to comment out that line in the isolinux.cfg file, also.
+<pre><code>
+#display boot.msg
+</code></pre>
 Save the file.  Next we want to customize the kickstart script.
 ### ks.cfg changes
 The following is the current ks.cfg file installed on the ISO
