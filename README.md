@@ -19,7 +19,7 @@ Create a directory to which you will copy the ISO files.
 Copy all files and directories to the newly created directory.
 <pre><code>sudo mount -o loop securityonion-2.3.30.iso /mnt
 sudo mkdir /tmp/seconionCustom
-sudo cp -r /mnt /tmp/seconionCustom
+sudo cp -Rvp /mnt/* /tmp/seconionCustom/
 cd /tmp/seconionCustom
 </code></pre>
 ## Make Security Onion ISO Configuration Changes
