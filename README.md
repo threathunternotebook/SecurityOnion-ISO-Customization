@@ -607,7 +607,7 @@ For goal 2, we need to comment out various lines that cause the install to wait 
 #    fi
 #  done
 </code></pre>
-We also want to make sure that an automatice reboot occurs after the install is complete.  To ensure this happens, we will comment out a few lines at the end of the ks.cfg script and add a reboot command at the end of the script as follows.
+We also want to make sure that an automatic reboot occurs after the install is complete.  To ensure this happens, we will comment out a few lines at the end of the ks.cfg script and add a reboot command at the end of the script as follows.
 <pre><code>
 #  echo "Initial Install Complete. Press [Enter] to reboot!"
 #  read -p "Initial Install Complete. Press [Enter] to reboot!"
