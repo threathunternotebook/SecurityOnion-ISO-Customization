@@ -519,3 +519,8 @@ fi
 @core
 %end
 </code></pre>
+Before we discuss changing the kickstart script, let's discuss our goals
+1. Since we are using Ansible to install our SO virtual machines directly to ESXi, we need to add a line to ensure our network interfaces activate properly.
+2. We want the SO install to be automatic with no user intervention.  We will need to comment out several sections of the kickstart script for this to happen.
+3. We want to  make sure a preliminary username and password is implemented so the Ansible playbooks can make the necessary SSH communications
+
