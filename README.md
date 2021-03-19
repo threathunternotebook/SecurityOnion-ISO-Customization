@@ -1036,3 +1036,8 @@ From our custom ISO directory, we want to compile the new ISO.
 <pre><code>
 mkisofs -o securityonionCustom-2.3.30.iso -allow-limited-size -b isolinux.bin -J -R -l -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -R -V "CentOS 7 x86_64" .
 </code></pre>
+Finally, we make the ISO bootable and prepare it to be copied to our ESXi datastore.
+<pre><code>
+isohybrid --uefi securityonionCustom-2.3.30.iso
+chmod 777 securityonionCustom-2.3.30.iso
+</code></pre>
