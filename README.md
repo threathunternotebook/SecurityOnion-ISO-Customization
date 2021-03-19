@@ -621,3 +621,409 @@ fi
 %end
 reboot
 </code></pre>
+#### Goal 3
+Finally we want to add a username and password to ensure that our Ansible palybooks can connect to the SO nodes. In the section below, we add the SOUSER, PASSWORD1, and PASSWORD2 lines after the section we previously commented out asking for a username and password input.
+<pre><code>
+...
+#      PASSWORD2+=$char
+#      # Print '*' in its stead.
+#      printf '*'
+#    fi
+#  done
+SOUSER="MYUSERNAME"
+PASSWORD1="MYPASSWORD"
+PASSWORD2="MYPASSWORD"
+  if [ $PASSWORD1 == $PASSWORD2 ]; then
+    echo PASSWORD=$PASSWORD1 >> /tmp/variables.txt
+...
+</code></pre>
+Below is an example of the customized ks.cfg file. The sections we commented out earlier are completely removed from this example.
+<pre><code>
+# Set the firewall to allow SSH
+firewall --enabled --port=22:tcp
+
+# Install Mode
+install
+
+# Lock the root account
+rootpw --lock
+
+# Force this to use the shadow file
+auth --useshadow --passalgo=sha512
+
+# Install via Text Mode
+text
+
+# Disable firstboot. We don't have a GUI
+firstboot --disable
+
+# Set the keyboard
+keyboard us
+
+# Set the language
+lang en_US
+
+# Turn on SELinux
+selinux --enforcing
+
+# No X Windows please
+skipx
+
+# Installation logging level
+logging --level=info
+
+# Reboot after install
+reboot --eject
+
+# System timezone to UTC
+timezone --isUtc Etc/UTC
+
+#%include /tmp/uefi
+%include /tmp/part-include
+
+%pre
+
+#!/bin/sh
+exec < /dev/tty6 > /dev/tty6
+
+# Switch to the tty so we can type stuff
+chvt 6
+
+# Get the megarams
+mem=$(($(free -m | grep Mem | awk '{print $2}')+2000))
+
+# Set drives to 0 for now
+NUMDRIVES=0
+
+# Block device directory
+DIR="/sys/block"
+
+# Minimum drive size in GIGABYTES
+MINSIZE=99
+
+# Set the root drive to blank for now
+ROOTDRIVE=""
+
+if [ -d /sys/firmware/efi ]; then
+  is_uefi=true
+fi
+
+TEMPDRIVE=/tmp/part-include
+
+# Ask some basic questions
+
+# Network information
+network  --bootproto=dhcp --device=link --onboot=on --activate
+
+for DEV in sda sdb sdc sdd hda hdb hdc hdd vda vdb vdc vdd nvme0n1 nvme1n1 nvme2n1 nvme3n1 xvda xvdb xvdc xvdd ; do
+  if [ -d $DIR/$DEV ]; then
+
+    # Find removeable devices so we don't install on them
+    REMOVABLE=$(cat $DIR/$DEV/removable)
+
+    if (( $REMOVABLE == 0 )); then
+      NUMDRIVES=$((NUMDRIVES+1))
+      SIZE=$(cat $DIR/$DEV/size)
+      GB=$(($SIZE/2**21))
+    fi
+  fi
+done
+
+# If there is a single drive move forward
+if [ $NUMDRIVES -lt 2 ]; then
+  for DEV in sda sdb sdc sdd hda hdb hdc hdd vda vdb vdc vdd nvme0n1 nvme1n1 nvme2n1 nvme3n1 xvda xvdb xvdc xvdd ; do
+    if [ -d $DIR/$DEV ]; then
+      REMOVABLE=$(cat $DIR/$DEV/removable)
+      if (( $REMOVABLE == 0 )); then
+        SIZE=$(cat $DIR/$DEV/size)
+        GB=$(($SIZE/2**21))
+        if [ $GB -gt $MINSIZE ]; then
+          ROOTDRIVE=$DEV
+        else
+          echo "Not enough space to install Security Onion. You need at least $MINSIZE GB to proceed"
+          read drivetoosmall
+        fi
+      fi
+    fi
+  done
+
+  ROOTSIZE=$(($GB/3))
+
+  # Set the volume size to 300GB if it's larger than 300GB
+  if [ $ROOTSIZE -gt 300 ]; then
+    ROOTPART=300
+  else
+  # If there isn't at least 300GB set it to what is there.
+    ROOTPART=$ROOTSIZE
+  fi
+
+# Determine if we need to use gpt
+#  if [ $GB -gt 1 ]; then
+    parted -s /dev/$ROOTDRIVE mklabel gpt
+#  fi
+  echo 'zerombr' > $TEMPDRIVE
+  echo -e "clearpart --all --drives=$ROOTDRIVE --initlabel" >> $TEMPDRIVE
+  if [ ! $is_uefi ]; then
+  echo -e "bootloader --location=mbr --driveorder=$ROOTDRIVE" >> $TEMPDRIVE
+  echo -e "part biosboot --fstype=biosboot --size=1 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+  echo -e "part /boot --asprimary --fstype=xfs --size=500 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+  fi
+  if [ $is_uefi ]; then
+  echo -e "part /boot/efi --asprimary --fstype="fat32" --size=1024 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+  echo -e "part /boot --fstype=xfs --size=500 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+  fi
+  echo -e "part pv.1 --size 1 --grow --fstype=xfs --ondrive=$ROOTDRIVE" >> $TEMPDRIVE
+  echo -e "volgroup system pv.1" >> $TEMPDRIVE
+  echo -e "logvol swap --vgname system --size=8192 --name=swap" >> $TEMPDRIVE
+  echo -e "logvol /tmp --fstype xfs --vgname system --size=2000 --name=tmp --fsoptions=\"nodev,nosuid,noexec\"" >> $TEMPDRIVE
+  echo -e "logvol / --fstype xfs --vgname system --size=$(($ROOTPART*1000)) --name=root" >> $TEMPDRIVE
+  echo -e "logvol /nsm --fstype xfs --vgname system --grow --size=1 --name=nsm" >> $TEMPDRIVE
+
+else
+  echo "Multiple drives detected.  Let's answer some questions."
+
+  #If there's more than one drive we need to make some choices
+  NUMDRIVES=0
+  while [ -z $ROOTDRIVE ]
+  do
+    echo -e "Device\tSize"
+    for DEV in sda sdb sdc sdd hda hdb hdc hdd vda vdb vdc vdd nvme0n1 nvme1n1 nvme2n1 nvme3n1 xvda xvdb xvdc xvdd; do
+      if [ -d $DIR/$DEV ]; then
+        REMOVABLE=$(cat $DIR/$DEV/removable)
+        if (( $REMOVABLE == 0 )); then
+          NUMDRIVES=$((NUMDRIVES+1))
+          SIZE=$(cat $DIR/$DEV/size)
+          GB=$(($SIZE/2**21))
+          echo -e "$DEV\t$(($SIZE/2**21))GB"
+        fi
+      fi
+    done
+
+  echo "There are $NUMDRIVES available disk(s)"
+
+    echo "Which device would you like to use as the operating system filesystem (must be larger than $MINSIZE GB):"
+    read rootchoice
+    if [ -d $DIR/$rootchoice ]; then
+      REMOVABLE=$(cat $DIR/$rootchoice/removable)
+      if (( $REMOVABLE == 0 )); then
+        SIZE=$(cat $DIR/$rootchoice/size)
+        GB=$(($SIZE/2**21))
+        if [ $GB -gt $MINSIZE ]; then
+          echo -e "$rootchoice\t$(($SIZE/2**21))GB - OS Drive"
+          ROOTDRIVE=$rootchoice
+        else
+          echo "Available volume does not meet size requirements.  Please provide a volume greater than $MINSIZE GB"
+          NUMDRIVES=0
+        fi
+      else
+        echo "That is a removable drive. Please provide a device name for a fixed disk"
+        NUMDRIVES=0
+      fi
+    else
+      echo "That device does not exist.  Please pick one of the above listed devices"
+      NUMDRIVES=0
+    fi
+  done
+  SAMEDRIVE=""
+  NSMDRIVE=""
+  while [ -z $SAMEDRIVE ]
+  do
+    echo "Would you like to use the same device for NSM storage? (yes/no)"
+    read SAMEDRIVE
+    if [ "$SAMEDRIVE" == "yes" ]; then
+      NSMDRIVE=$ROOTDRIVE
+      echo -e "$rootchoice\t$(($SIZE/2**21))GB - NSM Drive"
+    elif [ "$SAMEDRIVE" == "no" ]; then
+      NUMDRIVES=0
+      while [ -z $NSMDRIVE ]
+      do
+        echo -e "Device\tSize"
+        for DEV in sda sdb sdc sdd hda hdb hdc hdd vda vdb vdc vdd nvme0n1 nvme1n1 nvme2n1 nvme3n1 xvda xvdb xvdc xvdd ; do
+          if [ -d $DIR/$DEV ]; then
+            REMOVABLE=$(cat $DIR/$DEV/removable)
+            if (( $REMOVABLE == 0 )); then
+              NUMDRIVES=$((NUMDRIVES+1))
+              SIZE=$(cat $DIR/$DEV/size)
+              GB=$(($SIZE/2**21))
+              if [ "$DEV" != "$ROOTDRIVE" ]; then
+                echo -e "$DEV\t$(($SIZE/2**21))GB"
+              fi
+            fi
+          fi
+        done
+        echo "Which device would you like to use for NSM storage:"
+        read whichnsm
+        if [ -d $DIR/$whichnsm ]; then
+          REMOVABLE=$(cat $DIR/$whichnsm/removable)
+          if (( $REMOVABLE == 0 )); then
+            echo -e "$whichnsm\t$(($SIZE/2**21))GB - NSM Drive"
+            NSMDRIVE=$whichnsm
+            PCAPSIZE=$(cat $DIR/$NSMDRIVE/size)
+            PCAPGB=$(($PCAPSIZE/2**21))
+          else
+            echo "That is a removable drive. Please provide a device name for a fixed disk"
+            NUMDRIVES=0
+          fi
+        else
+          echo "That device does not exist.  Please pick one of the above listed devices"
+          NUMDRIVES=0
+        fi
+      done
+    else
+      SAMEDRIVE=""
+    fi
+  done
+  ROOTRAWSIZE=$(cat $DIR/$ROOTDRIVE/size)
+  ROOTGB=$(($ROOTRAWSIZE/2**21))
+  if [ "$ROOTDRIVE" == "$NSMDRIVE" ]; then
+    ROOTSIZE=$(($ROOTGB/3))
+    if [ $ROOTSIZE -gt 300 ]; then
+      ROOTPART=300
+    else
+      ROOTPART=$ROOTSIZE
+    fi
+  else
+    ROOTPART=$ROOTGB
+  fi
+#  if [ $ROOTGB -gt 1900 ]; then
+    parted -s /dev/$ROOTDRIVE mklabel gpt
+#  fi
+  echo 'zerombr' > $TEMPDRIVE
+  if [ "$ROOTDRIVE" == "$NSMDRIVE" ]; then
+    echo -e "clearpart --all --drives=$ROOTDRIVE" >> $TEMPDRIVE
+  else
+    echo -e "clearpart --all --drives=$ROOTDRIVE,$NSMDRIVE --initlabel" >> $TEMPDRIVE
+  fi
+  if [ "$ROOTDRIVE" == "$NSMDRIVE" ]; then
+    if [ ! $is_uefi ]; then
+      echo -e "bootloader --location=mbr --driveorder=$ROOTDRIVE" >> $TEMPDRIVE
+      echo -e "part biosboot --fstype=biosboot --size=1" >> $TEMPDRIVE
+      echo -e "part /boot --asprimary --fstype=xfs --size=500 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+    else
+      echo -e "part /boot/efi --fstype="fat32" --size=1024 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+      echo -e "part /boot --fstype=xfs --size=500 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+    fi
+  else
+    if [ ! $is_uefi ]; then
+      echo -e "bootloader --location=mbr --driveorder=$ROOTDRIVE,$NSMDRIVE" >> $TEMPDRIVE
+      echo -e "part biosboot --fstype=biosboot --size=1" >> $TEMPDRIVE
+      echo -e "part /boot --asprimary --fstype=ext4 --size=500 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+    else
+      echo -e "part /boot/efi --fstype="fat32" --size=1024 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+      echo -e "part /boot --fstype=ext4 --size=500 --ondisk=$ROOTDRIVE" >> $TEMPDRIVE
+    fi
+  fi
+  echo -e "part pv.1 --size 1 --grow --fstype=xfs --ondrive=$ROOTDRIVE" >> $TEMPDRIVE
+  echo -e "volgroup system pv.1" >> $TEMPDRIVE
+  if [ "$ROOTDRIVE" == "$NSMDRIVE" ]; then
+    echo -e "logvol / --fstype xfs --vgname system --size=$(($ROOTPART*1000)) --name=root" >> $TEMPDRIVE
+    echo -e "logvol /nsm --fstype xfs --vgname system --grow --size=1 --name=nsm" >> $TEMPDRIVE
+  else
+#    if [ $PCAPGB -gt 1900 ]; then
+      parted -s /dev/$NSMDRIVE mklabel gpt
+#    fi
+    echo -e "part pv.2 --size 1 --grow --fstype=xfs --ondrive=$NSMDRIVE" >> $TEMPDRIVE
+    echo -e "volgroup nsm pv.2" >> $TEMPDRIVE
+    echo -e "logvol /nsm --fstype xfs --vgname nsm --grow --size=1 --name=nsm" >> $TEMPDRIVE
+    echo -e "logvol / --fstype xfs --vgname system --grow --size=1 --name=root" >> $TEMPDRIVE
+  fi
+fi
+
+manufacturer=$(dmidecode -s system-manufacturer)
+family=$(dmidecode -s system-family)
+product=$(dmidecode -s system-product-name)
+
+INSTALL=no
+PWMATCH=no
+
+if [[ "$manufacturer" == "Security Onion Solutions" && "$family" == "Automated" ]]; then
+  INSTALL=yes
+  PWMATCH=yes
+  SOUSER=onion
+  echo "PRODUCT=$product" >> /tmp/variables.txt
+  echo "SOUSER=$SOUSER" >> /tmp/variables.txt
+  echo "PASSWORD=automation" >> /tmp/variables.txt
+fi
+
+SOUSER="MYUSERNAME"
+PASSWORD1="MYPASSWORD"
+PASSWORD2="MYPASSWORD"
+  if [ $PASSWORD1 == $PASSWORD2 ]; then
+    echo PASSWORD=$PASSWORD1 >> /tmp/variables.txt
+    echo SOUSER=$SOUSER >> /tmp/variables.txt
+    PWMATCH=yes
+  else
+    echo "Passwords don't match. Press enter to try again. "
+    read -p
+  fi
+done
+exec < /dev/tty1 > /dev/tty1
+chvt 1
+%end
+
+%post --nochroot
+cp /tmp/variables.txt /mnt/sysimage/tmp/variables.txt
+mkdir /mnt/sysimage/root/SecurityOnion
+mkdir -p /mnt/sysimage/nsm/docker-registry/docker
+mkdir -p /mnt/sysimage/nsm/repo
+rsync -avh --exclude 'TRANS.TBL' /run/install/repo/SecurityOnion/* /mnt/sysimage/root/SecurityOnion/
+rsync -avh --exclude 'TRANS.TBL' /run/install/repo/docker/* /mnt/sysimage/nsm/docker-registry/docker/
+rsync -avh --exclude 'TRANS.TBL' /run/install/repo/Packages/* /mnt/sysimage/nsm/repo/
+chmod +x /mnt/sysimage/root/SecurityOnion/setup/so-setup
+
+%end
+
+%post
+source /tmp/variables.txt
+rm -f /tmp/variables.txt
+
+useradd $SOUSER
+cp -Rvp /root/SecurityOnion /home/$SOUSER/
+chown -R $SOUSER:$SOUSER /home/$SOUSER/SecurityOnion/
+chmod +x /home/$SOUSER/SecurityOnion/so-setup
+chmod -R +x /home/$SOUSER/SecurityOnion/salt/common/tools/sbin/
+echo $SOUSER:$PASSWORD | chpasswd --crypt-method=SHA512
+echo "$SOUSER   ALL=(ALL)       ALL" >> /etc/sudoers
+echo "$SOUSER   ALL=(ALL) NOPASSWD: /home/$SOUSER/SecurityOnion/setup/so-setup" >> /etc/sudoers
+#echo "sudo /home/$SOUSER/SecurityOnion/setup/so-setup iso" >> /home/$SOUSER/.bash_profile
+
+if [ ! -z $PASSWORD ]; then
+  echo $SOUSER:$PASSWORD | chpasswd --crypt-method=SHA512
+fi
+
+#if [ ! -z $PRODUCT ]; then
+#  echo "@reboot sudo /home/$SOUSER/SecurityOnion/setup/so-setup iso $PRODUCT" | crontab -u $SOUSER -
+#fi
+
+# fix onboot line so interface will come up.
+sed -i 's/ONBOOT=no/ONBOOT=yes/g' /etc/sysconfig/network-scripts/ifcfg-ens192
+
+
+# SSHD Banner
+touch /etc/ssh/sshd-banner
+echo "##########################################" > /etc/ssh/sshd-banner
+echo "##########################################" >> /etc/ssh/sshd-banner
+echo "###                                    ###" >> /etc/ssh/sshd-banner
+echo "###   UNAUTHORIZED ACCESS PROHIBITED   ###" >> /etc/ssh/sshd-banner
+echo "###                                    ###" >> /etc/ssh/sshd-banner
+echo "##########################################" >> /etc/ssh/sshd-banner
+echo "##########################################" >> /etc/ssh/sshd-banner
+
+# Set the SSHD banner
+echo "Banner /etc/ssh/sshd-banner" >> /etc/ssh/sshd_config
+
+if [ -z $PRODUCT ]; then
+  exec < /dev/tty6 > /dev/tty6
+  chvt 6
+  clear
+  exec < /dev/tty1 > /dev/tty1
+  chvt 1
+fi
+%end
+
+%packages --nobase
+@core
+%end
+reboot
+</code></pre>
+Save the ks.cfg file once customization is complete
