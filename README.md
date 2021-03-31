@@ -457,7 +457,6 @@ while [ $PWMATCH != yes ]; do
     echo "Passwords don't match. Press enter to try again. "
     read -p
   fi
-done
 exec < /dev/tty1 > /dev/tty1
 chvt 1
 %end
