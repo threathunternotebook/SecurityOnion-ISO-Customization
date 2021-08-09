@@ -525,7 +525,8 @@ fi
 Before we discuss changing the kickstart script, let's discuss our goals
 1. Since we are using Ansible to install our SO virtual machines directly to ESXi, we need to add a line to ensure our network interfaces activate properly.
 2. We want the SO install to be automatic with no user intervention.  We will need to comment out several sections of the kickstart script for this to happen.
-3. We want to  make sure a preliminary username and password is implemented so the Ansible playbooks can make the necessary SSH communications
+3. We want to  make sure a preliminary username and password is implemented so the Ansible playbooks can make the necessary SSH communications.
+4. We want to set the SecurityOnion tools directory to executable to ensure the automated install process has the correct permissions.
 
 #### Goal 1
 For goal 1, we will add the following lines to the ks.cfg script
@@ -640,6 +641,12 @@ PASSWORD2="MYPASSWORD"
     echo PASSWORD=$PASSWORD1 >> /tmp/variables.txt
 ...
 </code></pre>
+#### Goal 4
+Add the following to the ks.cfg
+<pre><code>
+chmod -R +x /home/$SOUSER/SecurityOnion/salt/common/tools/sbin/
+</code></pre>
+
 Below is an example of the customized ks.cfg file. The sections we commented out earlier are completely removed from this example.
 <pre><code>
 # Set the firewall to allow SSH
