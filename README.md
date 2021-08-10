@@ -3,7 +3,7 @@ Security Onion ISO Customization Process
 In this repo, we will present a method (one of many) to customize the Security Onion 2.3 ISO.  The reason for this is to bypass certain options and apply new options to the kickstart script (ks.cfg) in order to automate the process of installing Security Onion 2.3 in special circumstances. The circumstances in this case are deploying SO 2.3 to multiple ESXi systems without user intervention.
 ## Setup Security Onion ISO for custom configuration
 The first step to creating a custom SO ISO is to download the ISO to a system that can create an ISO.  In this case, we use either a Ubuntu system or CentOS system.
-The current version of SO is 2.3.30.
+The current version of SO is 2.3.61.
 On a Ubuntu system ensure the following packages are installed:
 <pre><code>sudo apt install isohybrid
 sudo apt install syslinux-utils
@@ -17,7 +17,7 @@ Copy the Security Onion 2.3.x ISO to your Linux platform.
 Mount the ISO.
 Create a directory to which you will copy the ISO files.
 Copy all files and directories to the newly created directory.
-<pre><code>sudo mount -o loop securityonion-2.3.30.iso /mnt
+<pre><code>sudo mount -o loop securityonion-2.3.61.iso /mnt
 sudo mkdir /tmp/seconionCustom
 sudo cp -Rvp /mnt/* /tmp/seconionCustom/
 cd /tmp/seconionCustom
@@ -30,38 +30,38 @@ The isolinux.cfg file is the boot menu that allows the user to select how they w
 Change the following
 <pre><code>
 label linux
-  menu label ^Install Security Onion 2.3.30
+  menu label ^Install Security Onion 2.3.61
   menu default
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 ks=file:///ks.cfg quiet
 
 label linux
-  menu label ^Install Security Onion 2.3.30 in basic graphics mode
+  menu label ^Install Security Onion 2.3.61 in basic graphics mode
   menu default
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 ks=file:///ks.cfg nomodeset quiet
 
 label check
-  menu label Test this ^media & install Security Onion 2.3.30
+  menu label Test this ^media & install Security Onion 2.3.61
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 rd.live.check ks=file:///ks.cfg quiet
 </code></pre>
 Changes to make are lines related to the *ks* option.  Basically changing **ks=file:///ks.cfg** to **ks=cdrom:/ks.cfg**.
 <pre><code>
 label linux
-  menu label ^Install Security Onion 2.3.30
+  menu label ^Install Security Onion 2.3.61
   menu default
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 ks=cdrom:/ks.cfg
 
 label linux
-  menu label ^Install Security Onion 2.3.30 in basic graphics mode
+  menu label ^Install Security Onion 2.3.61 in basic graphics mode
   menu default
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 ks=cdrom:/ks.cfg nomodeset
 
 label check
-  menu label Test this ^media & install Security Onion 2.3.30
+  menu label Test this ^media & install Security Onion 2.3.61
   kernel vmlinuz
   append initrd=initrd.img inst.stage2=hd:LABEL=CentOS\x207\x20x86_64 rd.live.check ks=cdrom:/ks.cfg
 </code></pre>
@@ -1040,10 +1040,10 @@ Save the ks.cfg file once customization is complete
 ## Compile the Custom ISO
 From our custom ISO directory, we want to compile the new ISO. 
 <pre><code>
-mkisofs -o securityonionCustom-2.3.30.iso -allow-limited-size -b isolinux.bin -J -R -l -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -R -V "CentOS 7 x86_64" .
+mkisofs -o securityonionCustom-2.3.61.iso -allow-limited-size -b isolinux.bin -J -R -l -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e images/efiboot.img -no-emul-boot -graft-points -joliet-long -R -V "CentOS 7 x86_64" .
 </code></pre>
 Finally, we make the ISO bootable and prepare it to be copied to our ESXi datastore.
 <pre><code>
-isohybrid --uefi securityonionCustom-2.3.30.iso
-chmod 777 securityonionCustom-2.3.30.iso
+isohybrid --uefi securityonionCustom-2.3.61.iso
+chmod 777 securityonionCustom-2.3.61.iso
 </code></pre>
