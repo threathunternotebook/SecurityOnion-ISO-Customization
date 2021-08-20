@@ -1034,7 +1034,6 @@ fi
 %packages --nobase
 @core
 %end
-reboot
 </code></pre>
 Save the ks.cfg file once customization is complete
 ## Compile the Custom ISO
