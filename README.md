@@ -673,6 +673,9 @@ keyboard us
 # Set the language
 lang en_US
 
+# Network information
+network  --bootproto=dhcp --device=link --onboot=on --activate
+
 # Turn on SELinux
 selinux --enforcing
 
@@ -721,9 +724,6 @@ fi
 TEMPDRIVE=/tmp/part-include
 
 # Ask some basic questions
-
-# Network information
-network  --bootproto=dhcp --device=link --onboot=on --activate
 
 for DEV in sda sdb sdc sdd hda hdb hdc hdd vda vdb vdc vdd nvme0n1 nvme1n1 nvme2n1 nvme3n1 xvda xvdb xvdc xvdd ; do
   if [ -d $DIR/$DEV ]; then
