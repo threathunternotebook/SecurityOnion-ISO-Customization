@@ -3,7 +3,7 @@ Security Onion ISO Customization Process
 In this repo, we will present a method (one of many) to customize the Security Onion 2.3 ISO.  The reason for this is to bypass certain options and apply new options to the kickstart script (ks.cfg) in order to automate the process of installing Security Onion 2.3 in special circumstances. The circumstances in this case are deploying SO 2.3 to multiple ESXi systems without user intervention.
 ## Setup Security Onion ISO for custom configuration
 The first step to creating a custom SO ISO is to download the ISO to a system that can create an ISO.  In this case, we use either a Ubuntu system or CentOS system.
-The current version of SO is 2.3.100.
+The current version of SO is 2.3.140.
 On a Ubuntu system ensure the following packages are installed:
 <pre><code>sudo apt install isohybrid
 sudo apt install syslinux-utils
